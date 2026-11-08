@@ -1,0 +1,312 @@
+:root {
+  color-scheme: dark;
+  --page: #141021;
+  --frame: #2b2340;
+  --frame-edge: #3d3258;
+  --btn: #4a3d6b;
+  --btn-edge: #6a5a8f;
+  --btn-text: #efe6d4;
+  --accent-a: #ef7aa8;
+  --accent-b: #5fc9d9;
+  --text: #b8adcf;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--page);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.shell {
+  display: grid;
+  gap: 20px;
+  justify-items: center;
+  padding: 24px 16px;
+}
+
+/* Screen: logical 160x144, scaled with integer-friendly width and crisp pixels. */
+.screen-frame {
+  padding: 14px;
+  background: var(--frame);
+  border: 2px solid var(--frame-edge);
+  border-radius: 6px;
+  line-height: 0;
+}
+
+.screen {
+  width: min(480px, calc(100vw - 64px));
+  aspect-ratio: 160 / 144;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+  background: #221a3a;
+}
+
+/* Controls */
+.controls {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'dpad ab'
+    'menu menu';
+  gap: 18px 40px;
+  align-items: center;
+}
+
+button {
+  font: inherit;
+  color: var(--btn-text);
+  background: var(--btn);
+  border: 2px solid var(--btn-edge);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 60ms ease, background 60ms ease;
+}
+
+button:active {
+  transform: translateY(2px);
+  background: var(--btn-edge);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 2px;
+}
+
+.dpad {
+  grid-area: dpad;
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  grid-template-areas:
+    '. up .'
+    'left center right'
+    '. down .';
+}
+
+.dpad-btn {
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.dpad-btn.up {
+  grid-area: up;
+}
+.dpad-btn.down {
+  grid-area: down;
+}
+.dpad-btn.left {
+  grid-area: left;
+}
+.dpad-btn.right {
+  grid-area: right;
+}
+.dpad-center {
+  grid-area: center;
+  background: var(--btn);
+}
+
+.ab {
+  grid-area: ab;
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.round-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.round-btn.a {
+  background: var(--accent-a);
+  border-color: #ffa9c9;
+  color: #2a1030;
+  margin-bottom: 18px;
+}
+
+.round-btn.b {
+  background: var(--accent-b);
+  border-color: #a4ecf5;
+  color: #0d2a30;
+}
+
+.menu {
+  grid-area: menu;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.pill-btn {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+  text-align: center;
+}
+
+/* ---- 3D handheld page --------------------------------------------------- */
+
+body[data-view='handheld'] {
+  display: block;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #2a2340 0%, #161222 55%, #0e0b16 100%);
+}
+
+.handheld-page {
+  position: fixed;
+  inset: 0;
+}
+
+.stage {
+  position: absolute !important;
+  inset: 0;
+  touch-action: none;
+}
+
+.hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: max(14px, env(safe-area-inset-top)) 18px 0;
+  pointer-events: none;
+}
+
+.hud-title {
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #efe6d4;
+  font-size: 13px;
+}
+
+.hud-link {
+  pointer-events: auto;
+  color: var(--text);
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.hud-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 44px;
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: #d9cfe9;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.hud-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(34px, calc(env(safe-area-inset-bottom) + 28px));
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+}
+
+.hud-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  background: rgba(40, 32, 64, 0.85);
+  border: 1px solid #54467d;
+}
+
+.hud-btn .led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4a1d1d;
+}
+
+.hud-btn.is-on .led {
+  background: #ff3b2f;
+  box-shadow: 0 0 6px #ff3b2f;
+}
+
+.hud-keys {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+@media (hover: none) {
+  .hud-keys {
+    display: none;
+  }
+}
+
+/* Flat view: way back to the handheld, always visible top-left */
+.back-btn {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: 16px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--btn-text);
+  text-decoration: none;
+  background: rgba(40, 32, 64, 0.9);
+  border: 1px solid #54467d;
+  z-index: 10;
+}
+
+.back-btn:hover {
+  background: #3a2e5c;
+}
+
+.hud-link {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #54467d;
+  background: rgba(40, 32, 64, 0.85);
+  text-decoration: none;
+  color: var(--btn-text);
+  opacity: 0.85;
+}
