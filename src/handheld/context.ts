@@ -11,6 +11,11 @@ export interface HandheldContextValue {
   /** Send a button press (unlocks audio first). */
   press: (action: Action) => void
   togglePower: () => void
+  /**
+   * True only while the handheld is in your hands (handheldActive). In the
+   * lunchbox its buttons are inert and a click picks the whole device up.
+   */
+  isActive: () => boolean
 }
 
 export const HandheldContext = createContext<HandheldContextValue | null>(null)

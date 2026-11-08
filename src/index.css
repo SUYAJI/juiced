@@ -177,7 +177,8 @@ button:focus-visible {
 body[data-view='handheld'] {
   display: block;
   overflow: hidden;
-  background: radial-gradient(ellipse at 50% 40%, #2a2340 0%, #161222 55%, #0e0b16 100%);
+  /* warm neutral room tone; the table surface fades into it */
+  background: radial-gradient(ellipse at 50% 58%, #3a3437 0%, #221e23 55%, #141116 100%);
 }
 
 .handheld-page {
@@ -221,7 +222,8 @@ body[data-view='handheld'] {
   position: absolute;
   left: 0;
   right: 0;
-  top: 44px;
+  top: max(84px, calc(env(safe-area-inset-top) + 76px));
+  padding: 0 16px;
   margin: 0;
   text-align: center;
   font-size: 12px;
@@ -309,4 +311,69 @@ body[data-view='handheld'] {
   text-decoration: none;
   color: var(--btn-text);
   opacity: 0.85;
+}
+
+/* ---- lunchbox cues: small, quiet, out of the way ------------------------ */
+
+.hud-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(26px, calc(env(safe-area-inset-bottom) + 18px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.hud-cue {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  color: #eadfcb;
+  opacity: 0.82;
+  animation: cue-in 900ms ease 300ms both;
+}
+
+.hud-quiet {
+  pointer-events: auto;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid rgba(234, 223, 203, 0.25);
+  color: #d9cfbd;
+  opacity: 0.75;
+}
+
+.hud-quiet:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.hud-back {
+  position: absolute;
+  top: max(44px, calc(env(safe-area-inset-top) + 34px));
+  left: 16px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(40, 32, 64, 0.7);
+  border: 1px solid #54467d;
+  opacity: 0.85;
+}
+
+@keyframes cue-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-cue {
+    animation: none;
+  }
 }

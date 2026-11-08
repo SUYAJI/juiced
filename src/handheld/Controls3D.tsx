@@ -18,7 +18,7 @@ const TILT = 0.13
  * Each arm is its own hit target; the whole cross animates.
  */
 export function DPad() {
-  const { controller, press } = useHandheld()
+  const { controller, press, isActive } = useHandheld()
   const rocker = useRef<THREE.Group>(null)
   const [held, setHeld] = useState<Dir | null>(null)
   const flash = useRef<{ dir: Dir; until: number } | null>(null)
@@ -51,6 +51,7 @@ export function DPad() {
   })
 
   const down = (dir: Dir) => (e: ThreeEvent<PointerEvent>) => {
+    if (!isActive()) return
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
     if (controls) controls.enabled = false
@@ -58,6 +59,7 @@ export function DPad() {
     press(dir as Action)
   }
   const up = (e: ThreeEvent<PointerEvent>) => {
+    if (!isActive() && !held) return
     e.stopPropagation()
     ;(e.target as Element).releasePointerCapture?.(e.pointerId)
     if (controls) controls.enabled = true
@@ -72,8 +74,8 @@ export function DPad() {
     smoothness: 3,
     onPointerUp: up,
     onPointerCancel: up,
-    onPointerOver: () => (document.body.style.cursor = 'pointer'),
-    onPointerOut: () => (document.body.style.cursor = 'auto'),
+    onPointerOver: () => isActive() && (document.body.style.cursor = 'pointer'),
+    onPointerOut: () => isActive() && (document.body.style.cursor = 'auto'),
   }
 
   return (

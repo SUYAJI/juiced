@@ -206,7 +206,7 @@ function EdgeDetails() {
  * allowed viewing angles.
  */
 function PowerSwitch({ z }: { z: number }) {
-  const { store, togglePower } = useHandheld()
+  const { store, togglePower, isActive } = useHandheld()
   const state = useGameState(store)
   const on = state.power !== 'off'
   const slider = useRef<THREE.Group>(null)
@@ -221,17 +221,19 @@ function PowerSwitch({ z }: { z: number }) {
     }
     const m = nubMat.current
     if (m) {
-      const breathe = on ? 0 : 0.25 + 0.25 * Math.sin(clock.elapsedTime * 3)
+      const breathe = on || !isActive() ? 0 : 0.25 + 0.25 * Math.sin(clock.elapsedTime * 3)
       m.emissiveIntensity = hover ? 0.7 : breathe
     }
   })
 
   const handlers = {
     onPointerDown: (e: ThreeEvent<PointerEvent>) => {
+      if (!isActive()) return
       e.stopPropagation()
       togglePower()
     },
     onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+      if (!isActive()) return
       e.stopPropagation()
       setHover(true)
       document.body.style.cursor = 'pointer'

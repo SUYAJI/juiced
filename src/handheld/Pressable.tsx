@@ -19,7 +19,7 @@ interface Props {
  * flash the same travel so the device always matches what the player did.
  */
 export function Pressable({ action, depth = 0.08, position, rotation, children }: Props) {
-  const { controller, press } = useHandheld()
+  const { controller, press, isActive } = useHandheld()
   const inner = useRef<Group>(null)
   const [held, setHeld] = useState(false)
   const flashUntil = useRef(0)
@@ -41,6 +41,7 @@ export function Pressable({ action, depth = 0.08, position, rotation, children }
   })
 
   const onDown = (e: ThreeEvent<PointerEvent>) => {
+    if (!isActive()) return // let the click reach the device carrier
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
     if (controls) controls.enabled = false
@@ -48,6 +49,7 @@ export function Pressable({ action, depth = 0.08, position, rotation, children }
     press(action)
   }
   const onUp = (e: ThreeEvent<PointerEvent>) => {
+    if (!isActive() && !held) return
     e.stopPropagation()
     ;(e.target as Element).releasePointerCapture?.(e.pointerId)
     if (controls) controls.enabled = true
@@ -61,8 +63,8 @@ export function Pressable({ action, depth = 0.08, position, rotation, children }
         onPointerDown={onDown}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        onPointerOver={() => (document.body.style.cursor = 'pointer')}
-        onPointerOut={() => (document.body.style.cursor = 'auto')}
+        onPointerOver={() => isActive() && (document.body.style.cursor = 'pointer')}
+        onPointerOut={() => isActive() && (document.body.style.cursor = 'auto')}
       >
         {children}
       </group>

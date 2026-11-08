@@ -16,6 +16,10 @@ export class AudioEngine {
   private blip!: Tone.PolySynth<Tone.Synth>
   private ui!: Tone.PolySynth<Tone.Synth>
   private repeatId: number | null = null
+  private master!: Tone.Volume
+  private zipSynth: Tone.NoiseSynth | null = null
+  private zipLfo: Tone.LFO | null = null
+  private cloth: Tone.NoiseSynth | null = null
   private stepCounter = 0
 
   get isStarted(): boolean {
@@ -28,6 +32,7 @@ export class AudioEngine {
     await Tone.start()
 
     const master = new Tone.Volume(-6).toDestination()
+    this.master = master
     const echo = new Tone.FeedbackDelay({
       delayTime: STEP_NOTE,
       feedback: 0.22,
@@ -144,6 +149,57 @@ export class AudioEngine {
     this.lead.triggerAttackRelease('G5', '16n', time + 0.13)
     this.blip.triggerAttackRelease('C6', '16n', time + 0.3)
     this.blip.triggerAttackRelease('E6', '8n', time + 0.42)
+  }
+
+  // ---- Lunchbox: zipper and fabric -----------------------------------
+
+  /**
+   * A zipper run: band-passed noise chopped by a square LFO (the teeth),
+   * speeding up mid-pull. Built on first use.
+   */
+  zip(duration: number): void {
+    if (!this.started) return
+    if (!this.zipSynth) {
+      const gate = new Tone.Gain(0)
+      this.zipLfo = new Tone.LFO({ frequency: 36, min: 0.15, max: 1, type: 'square' }).connect(gate.gain).start()
+      const band = new Tone.Filter({ type: 'bandpass', frequency: 3000, Q: 0.8 })
+      const vol = new Tone.Volume(-15).connect(this.master)
+      this.zipSynth = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.03, decay: 0.05, sustain: 0.8, release: 0.12 },
+      })
+      this.zipSynth.chain(band, gate, vol)
+    }
+    const t = Tone.now() + 0.01
+    const f = this.zipLfo!.frequency
+    f.cancelScheduledValues(t)
+    f.setValueAtTime(26, t)
+    f.linearRampToValueAtTime(58, t + duration * 0.45)
+    f.linearRampToValueAtTime(34, t + duration)
+    try {
+      this.zipSynth.triggerAttackRelease(duration, t)
+    } catch {
+      /* a second pull mid-pull: ignore */
+    }
+  }
+
+  /** Soft fabric handling: a short low-passed pink noise brush. */
+  rustle(length = 0.4): void {
+    if (!this.started) return
+    if (!this.cloth) {
+      const lp = new Tone.Filter({ type: 'lowpass', frequency: 1300, Q: 0.3 })
+      const vol = new Tone.Volume(-19).connect(this.master)
+      this.cloth = new Tone.NoiseSynth({
+        noise: { type: 'pink' },
+        envelope: { attack: 0.07, decay: length, sustain: 0, release: 0.1 },
+      })
+      this.cloth.chain(lp, vol)
+    }
+    try {
+      this.cloth.triggerAttackRelease(length, Tone.now() + 0.01)
+    } catch {
+      /* overlapping rustle: ignore */
+    }
   }
 
   // ---- Editing feedback ----------------------------------------------
