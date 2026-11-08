@@ -1,5 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useHandheld } from './context'
 import { BACK_Z, BARCODE, BATTERY, BAY, LABEL } from './dims'
 import { backLabelTexture, barcodeTexture, batteryTexture } from './textures'
 
@@ -36,8 +38,8 @@ export function Back() {
         <meshStandardMaterial color="#1f1a30" roughness={0.9} />
       </mesh>
 
-      <Battery y={BATTERY.y1} wrap={wrap} flip={false} />
-      <Battery y={BATTERY.y2} wrap={wrap} flip />
+      <Battery index={0} y={BATTERY.y1} wrap={wrap} flip={false} />
+      <Battery index={1} y={BATTERY.y2} wrap={wrap} flip />
 
       {/* Regulatory-style label */}
       <mesh position={[LABEL.x, LABEL.y, BACK_Z - 0.004]} rotation={faceBack}>
@@ -79,14 +81,47 @@ export function Back() {
   )
 }
 
-function Battery({ y, wrap, flip }: { y: number; wrap: THREE.Texture; flip: boolean }) {
+/**
+ * One AA. Click (in hand) to lift it out of the bay; click again to drop it
+ * back in. Taking one out lets a few juice drops escape from the bay.
+ */
+function Battery({ index, y, wrap, flip }: { index: 0 | 1; y: number; wrap: THREE.Texture; flip: boolean }) {
   // Cylinder axis is y; rotate so it lies along x. Positive end (nub) at +x
   // for one cell and -x for the other, as they sit in the photo.
   const rz = flip ? Math.PI / 2 : -Math.PI / 2
   const nubX = flip ? -BATTERY.len / 2 - 0.05 : BATTERY.len / 2 + 0.05
   const z = -BATTERY.r - 0.04
+  const { parts, isActive } = useHandheld()
+  const g = useRef<THREE.Group>(null)
+  const k = useRef(0)
+
+  useFrame((_, dt) => {
+    const grp = g.current
+    if (!grp) return
+    const out = parts.get().batteries[index]
+    k.current += ((out ? 1 : 0) - k.current) * (1 - Math.exp(-9 * Math.min(dt, 0.1)))
+    const e = k.current
+    // up out of the bay, away from the back, tipped and spread apart
+    const spread = index === 0 ? 1 : -1
+    grp.position.set(0.3 * e * spread, y + 0.9 * e * spread, z - 3.4 * e - Math.sin(Math.PI * e) * 0.6)
+    grp.rotation.set(0.25 * e * spread, 0.35 * e * spread, 0.18 * e)
+  })
+
+  const click = (e: ThreeEvent<PointerEvent>) => {
+    if (!isActive()) return
+    e.stopPropagation()
+    const nowOut = parts.toggleBattery(index)
+    if (nowOut) parts.spawn({ origin: [0, y, BACK_Z], side: 'back', count: 7 })
+  }
+
   return (
-    <group position={[0, y, z]}>
+    <group
+      ref={g}
+      position={[0, y, z]}
+      onPointerDown={click}
+      onPointerOver={() => isActive() && (document.body.style.cursor = 'pointer')}
+      onPointerOut={() => isActive() && (document.body.style.cursor = 'auto')}
+    >
       <mesh rotation={[0, 0, rz]}>
         <cylinderGeometry args={[BATTERY.r, BATTERY.r, BATTERY.len, 40]} />
         <meshStandardMaterial map={wrap} roughness={0.35} metalness={0.15} />

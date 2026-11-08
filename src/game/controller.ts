@@ -28,6 +28,8 @@ export class GameController {
   private winning = false
   private bootTimer: ReturnType<typeof setTimeout> | null = null
   private pressListeners = new Set<PressListener>()
+  /** True while a battery or the cartridge is out: no power. */
+  private powerBlocked = false
 
   constructor(
     private store: GameStore,
@@ -89,7 +91,18 @@ export class GameController {
     else this.powerOff()
   }
 
+  /** A battery or cartridge came out (true) or everything is back (false). */
+  setPowerBlocked(blocked: boolean): void {
+    this.powerBlocked = blocked
+    if (blocked) this.powerOff()
+  }
+
+  get isPowerBlocked(): boolean {
+    return this.powerBlocked
+  }
+
   powerOn(): void {
+    if (this.powerBlocked) return
     if (this.store.get().power !== 'off') return
     this.store.set({ power: 'booting', bootStartedAt: performance.now() })
     if (this.engine.isStarted) this.engine.bootChime(this.engine.now() + 0.45)

@@ -41,4 +41,4 @@ export const HANDLE = { x: 6.2, rise: 3.8, width: 3.1, thick: 0.95 }
 export const STRAP_RING_Y = LB.H - 2.4
 
 /** Where the handheld rests: on top of the wrapped lunch. */
-export const DEVICE_IN_BOX = { x: -2.6, y: 5.65, z: -1.2, yaw: 0.1 }
+export const DEVICE_IN_BOX = { x: 0.2, y: 5.65, z: -0.3, yaw: 0.1 }

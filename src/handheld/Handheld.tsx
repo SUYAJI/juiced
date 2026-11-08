@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { Back } from './Back'
 import { Cartridge } from './Cartridge'
+import { Critters } from './Critters'
 import { ActionButtons, DPad, MenuButtons } from './Controls3D'
 import { Screen } from './Screen'
 import { Shell } from './Shell'
@@ -20,6 +21,7 @@ export function Handheld() {
       </Suspense>
       <Back />
       <Cartridge />
+      <Critters />
     </group>
   )
 }

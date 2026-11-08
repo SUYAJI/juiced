@@ -1,5 +1,8 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
+import * as THREE from 'three'
+import { useHandheld } from './context'
 import { BACK_Z, CART, CART_BULGE, TOP_Y } from './dims'
 import { cartLabelTexture, cartNubTexture } from './textures'
 
@@ -11,6 +14,29 @@ const BULGE_COLOR = '#25232b'
  * the body on the back; the rounded rumble bulge fills the back window.
  */
 export function Cartridge() {
+  const { parts, isActive, isFlipped } = useHandheld()
+  const g = useRef<THREE.Group>(null)
+  const k = useRef(0)
+  useFrame((_, dt) => {
+    const grp = g.current
+    if (!grp) return
+    const out = parts.get().cart
+    k.current += ((out ? 1 : 0) - k.current) * (1 - Math.exp(-8 * Math.min(dt, 0.1)))
+    const e = k.current
+    // slides straight up out of the slot, then tips back a little
+    grp.position.set(0, 3.1 * e, 0.5 * e)
+    grp.rotation.set(0.12 * e, 0, 0.06 * e)
+  })
+  const click = (e: ThreeEvent<PointerEvent>) => {
+    if (!isActive()) return
+    e.stopPropagation()
+    const nowOut = parts.toggleCart()
+    if (nowOut) {
+      const side = isFlipped() ? 'back' : 'front'
+      parts.spawn({ origin: [0, TOP_Y - 0.2, 0], side, count: 9 })
+    }
+  }
+
   const label = useMemo(() => cartLabelTexture(), [])
   const nub = useMemo(() => cartNubTexture(), [])
   useEffect(
@@ -37,7 +63,12 @@ export function Cartridge() {
   const labelY = (labelTop + labelBottom) / 2
 
   return (
-    <group>
+    <group
+      ref={g}
+      onPointerDown={click}
+      onPointerOver={() => isActive() && (document.body.style.cursor = 'pointer')}
+      onPointerOut={() => isActive() && (document.body.style.cursor = 'auto')}
+    >
       <RoundedBox args={[CART.w, h, CART.d]} radius={0.12} smoothness={3} position={[0, cy, cz]}>
         <meshStandardMaterial color={CART_COLOR} roughness={0.72} />
       </RoundedBox>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AudioEngine } from './audio/engine'
 import { createAnim } from './experience/anim'
 import { ExperienceStore, prefersReducedMotion, useExperience } from './experience/store'
@@ -6,6 +6,7 @@ import { GameController, type Action } from './game/controller'
 import { LEVEL_01 } from './game/level'
 import { GameStore, useGameState } from './game/store'
 import type { HandheldContextValue } from './handheld/context'
+import { PartsStore, useParts } from './handheld/parts'
 import { attachKeyboard } from './input/keyboard'
 import { Renderer } from './render/renderer'
 import { Scene } from './scene/Scene'
@@ -32,7 +33,10 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
     const controller = new GameController(store, engine, LEVEL_01)
     const gameCanvas = document.createElement('canvas')
     const renderer = new Renderer(gameCanvas, store, LEVEL_01)
-    return { store, engine, controller, gameCanvas, renderer }
+    const parts = new PartsStore()
+    // a battery or the cartridge out means no power (composition is kept)
+    parts.subscribe(() => controller.setPowerBlocked(parts.anyOut()))
+    return { store, engine, controller, gameCanvas, renderer, parts }
   }, [])
   const exp = useMemo(() => new ExperienceStore(startInHand ? 'handheldActive' : 'lunchboxClosed', reduced), [startInHand, reduced])
   const anim = useMemo(() => {
@@ -44,6 +48,9 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
   const snap = useExperience(exp)
   const gameState = useGameState(game.store)
   const [flipped, setFlipped] = useState(false)
+  const flippedRef = useRef(false)
+  flippedRef.current = flipped
+  const partsState = useParts(game.parts)
   const [seen, setSeen] = useState(readSeen)
 
   const value = useMemo<HandheldContextValue>(() => {
@@ -56,7 +63,17 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       if (exp.state !== 'handheldActive') return
       void controller.ensureAudio().then(() => controller.togglePower())
     }
-    return { store, controller, renderer, gameCanvas, press, togglePower, isActive: () => exp.state === 'handheldActive' }
+    return {
+      store,
+      controller,
+      renderer,
+      gameCanvas,
+      press,
+      togglePower,
+      isActive: () => exp.state === 'handheldActive',
+      isFlipped: () => flippedRef.current,
+      parts: game.parts,
+    }
   }, [game, exp])
 
   // ---- experience actions (each one is a user gesture, so audio can start)
@@ -67,16 +84,12 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       open: () => {
         if (!exp.open()) return
         withAudio(() => {
-          engine.zip(exp.durations.unzip)
           setTimeout(() => engine.rustle(0.5), exp.durations.lidDelay * 1000)
         })
       },
       close: () => {
         if (!exp.close()) return
-        withAudio(() => {
-          engine.rustle(0.45)
-          setTimeout(() => engine.zip(exp.durations.zipUp), exp.durations.lidClose * 1000)
-        })
+        withAudio(() => engine.rustle(0.45))
       },
       pickUp: () => {
         if (!exp.pickUp()) return
@@ -85,6 +98,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       putBack: () => {
         if (!exp.putBack()) return
         setFlipped(false)
+        game.parts.reseatAll()
         withAudio(() => setTimeout(() => engine.rustle(0.3), exp.durations.putBack * 700))
       },
       skip: () => {
@@ -134,6 +148,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       pickUp: actions.pickUp,
       putBack: actions.putBack,
       close: actions.close,
+      parts: () => game.parts.get(),
       timeScale: (v: number) => {
         exp.timeScale = v
       },
@@ -148,6 +163,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
 
   const s = snap.state
   const off = gameState.power === 'off'
+  const missing = partsState.cart || partsState.batteries[0] || partsState.batteries[1]
 
   return (
     <div className="handheld-page" data-state={s}>
@@ -185,7 +201,16 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
           <button className="hud-back" onClick={actions.putBack} title="Esc">
             ← Put it back
           </button>
-          {off && !flipped && <p className="hud-hint">Click the glowing switch on the top edge, tap Power, or press P</p>}
+          {off && missing && (
+            <p className="hud-hint">
+              {partsState.cart && (partsState.batteries[0] || partsState.batteries[1])
+                ? 'Put the batteries and cartridge back to power on'
+                : partsState.cart
+                  ? 'Put the cartridge back to power on'
+                  : 'Put the batteries back to power on'}
+            </p>
+          )}
+          {off && !missing && !flipped && <p className="hud-hint">Click the glowing switch on the top edge, tap Power, or press P</p>}
           <nav className="hud-bar" aria-label="Device">
             <button className={`hud-btn ${off ? '' : 'is-on'}`} onClick={value.togglePower} aria-pressed={!off}>
               <span className="led" aria-hidden /> Power
