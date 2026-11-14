@@ -385,9 +385,12 @@ export class Renderer {
     }
     switch (s.phase) {
       case 'edit': {
+        // Before the first note and first run, state the goal instead.
+        const fresh = s.runs === 0 && s.sequence.every((n) => n === null)
         const note = s.sequence[s.cursorStep]
         const noteText = note === null ? `PITCH ${PITCH_LABELS[s.cursorLane]}` : `NOTE ${PITCH_LABELS[note]}`
-        drawText(ctx, `STEP ${s.cursorStep + 1}  ${noteText}`, WORLD_X, TEXT_Y1, PAL.ink)
+        const line1 = fresh ? 'JUICE ALL 3 FRUIT IN 1 RUN' : `STEP ${s.cursorStep + 1}  ${noteText}`
+        drawText(ctx, line1, WORLD_X, TEXT_Y1, PAL.ink)
         drawText(ctx, 'A NOTE B CLEAR START PLAY', WORLD_X, TEXT_Y2, PAL.inkDim)
         break
       }

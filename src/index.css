@@ -218,18 +218,31 @@ body[data-view='handheld'] {
   opacity: 0.6;
 }
 
+/* A solid pill, so it stays readable where it crosses the cartridge */
 .hud-hint {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
   top: max(84px, calc(env(safe-area-inset-top) + 76px));
-  padding: 0 16px;
+  width: max-content;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 7px 14px;
   margin: 0;
+  border-radius: 12px;
   text-align: center;
   font-size: 12px;
-  color: #d9cfe9;
-  opacity: 0.8;
+  line-height: 1.45;
+  color: #e6ddf3;
+  background: rgba(24, 20, 34, 0.88);
+  border: 1px solid #54467d;
   pointer-events: none;
+}
+
+/* Wide screens: sit in the top row, level with "Put it back", above the cartridge */
+@media (min-width: 760px) {
+  .hud-hint {
+    top: max(42px, calc(env(safe-area-inset-top) + 32px));
+  }
 }
 
 .hud-bar {
@@ -331,26 +344,26 @@ body[data-view='handheld'] {
   margin: 0;
   font-size: 13px;
   letter-spacing: 0.03em;
-  color: #eadfcb;
-  opacity: 0.82;
+  color: #f3ead9;
+  text-shadow: 0 1px 6px rgba(20, 16, 22, 0.75);
   animation: cue-in 900ms ease 300ms both;
 }
 
+/* Secondary actions over the light table: dark fill so they read */
 .hud-quiet {
   pointer-events: auto;
   font-size: 11px;
   letter-spacing: 0.04em;
-  padding: 5px 12px;
+  padding: 6px 13px;
   border-radius: 999px;
-  background: transparent;
-  border: 1px solid rgba(234, 223, 203, 0.25);
-  color: #d9cfbd;
-  opacity: 0.75;
+  background: rgba(34, 28, 40, 0.72);
+  border: 1px solid rgba(234, 223, 203, 0.32);
+  color: #efe6d4;
 }
 
 .hud-quiet:hover {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(34, 28, 40, 0.9);
+  border-color: rgba(234, 223, 203, 0.55);
 }
 
 .hud-back {

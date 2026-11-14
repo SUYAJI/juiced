@@ -19,13 +19,15 @@ interface Props {
   onOpen: () => void
   onClose: () => void
   onPick: () => void
+  /** Called once, after the lunchbox has loaded and drawn a couple of frames. */
+  onReady: () => void
 }
 
 /**
  * One continuous scene: the lunchbox on a neutral surface, and the
  * handheld, which is carried out of the tray into the play position.
  */
-export function Scene({ value, exp, anim, flipped, onOpen, onClose, onPick }: Props) {
+export function Scene({ value, exp, anim, flipped, onOpen, onClose, onPick, onReady }: Props) {
   const mobile = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 600
   return (
     <Canvas
@@ -65,6 +67,7 @@ export function Scene({ value, exp, anim, flipped, onOpen, onClose, onPick }: Pr
               document.body.style.cursor = over && (s === 'lunchboxClosed' || s === 'lunchboxOpen') ? 'pointer' : 'auto'
             }}
           />
+          <ReadySignal onReady={onReady} />
         </Suspense>
 
         <DeviceCarrier exp={exp} anim={anim} onPick={onPick}>
@@ -79,6 +82,20 @@ export function Scene({ value, exp, anim, flipped, onOpen, onClose, onPick }: Pr
       </HandheldContext.Provider>
     </Canvas>
   )
+}
+
+/**
+ * Mounts only once the lunchbox's Suspense boundary has resolved. Waits two
+ * rendered frames (the first one compiles shaders) before reporting ready.
+ */
+function ReadySignal({ onReady }: { onReady: () => void }) {
+  const frames = useRef(0)
+  useFrame(() => {
+    if (frames.current > 2) return
+    frames.current += 1
+    if (frames.current === 2) onReady()
+  })
+  return null
 }
 
 function Lights({ mobile }: { mobile: boolean }) {

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AudioEngine } from './audio/engine'
+import { dismissBoot } from './boot'
 import { createAnim } from './experience/anim'
 import { ExperienceStore, prefersReducedMotion, useExperience } from './experience/store'
 import { GameController, type Action } from './game/controller'
@@ -12,6 +13,9 @@ import { Renderer } from './render/renderer'
 import { Scene } from './scene/Scene'
 
 const SEEN_KEY = 'juiced.introSeen'
+/** Touch-first devices get "tap" wording and no keyboard mentions. */
+const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(hover: none)').matches
+const VERB = TOUCH ? 'Tap' : 'Click'
 const readSeen = () => {
   try {
     return localStorage.getItem(SEEN_KEY) === '1'
@@ -52,6 +56,15 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
   flippedRef.current = flipped
   const partsState = useParts(game.parts)
   const [seen, setSeen] = useState(readSeen)
+  // The scene has drawn its first frames: drop the loading screen and
+  // start listening for input (a tap before this would land on nothing).
+  const [ready, setReady] = useState(false)
+  const readyRef = useRef(false)
+  const onReady = useCallback(() => {
+    readyRef.current = true
+    setReady(true)
+    dismissBoot()
+  }, [])
 
   const value = useMemo<HandheldContextValue>(() => {
     const { store, controller, renderer, gameCanvas } = game
@@ -123,6 +136,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
     const detach = attachKeyboard(value.press, () => void controller.ensureAudio())
     const extra = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return
+      if (!readyRef.current) return
       const s = exp.state
       if (s === 'handheldActive') {
         if (e.key === 'p' || e.key === 'P') value.togglePower()
@@ -164,10 +178,21 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
   const s = snap.state
   const off = gameState.power === 'off'
   const missing = partsState.cart || partsState.batteries[0] || partsState.batteries[1]
+  // First time at the controls: say what the puzzle is until the first run.
+  const showGoal = gameState.power === 'on' && gameState.phase === 'edit' && gameState.runs === 0 && !flipped
 
   return (
-    <div className="handheld-page" data-state={s}>
-      <Scene value={value} exp={exp} anim={anim} flipped={flipped} onOpen={actions.open} onClose={actions.close} onPick={actions.pickUp} />
+    <div className="handheld-page" data-state={s} data-ready={ready}>
+      <Scene
+        value={value}
+        exp={exp}
+        anim={anim}
+        flipped={flipped}
+        onOpen={actions.open}
+        onClose={actions.close}
+        onPick={actions.pickUp}
+        onReady={onReady}
+      />
 
       <header className="hud-top">
         <span className="hud-title">JUICED</span>
@@ -176,9 +201,9 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
         </a>
       </header>
 
-      {s === 'lunchboxClosed' && (
+      {ready && s === 'lunchboxClosed' && (
         <div className="hud-foot">
-          <p className="hud-cue">Tap the lunchbox to unzip it</p>
+          <p className="hud-cue">{VERB} the lunchbox to unzip it</p>
           {seen && (
             <button className="hud-quiet" onClick={actions.skip}>
               Skip to the handheld
@@ -189,7 +214,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
 
       {s === 'lunchboxOpen' && (
         <div className="hud-foot">
-          <p className="hud-cue">Tap the handheld to pick it up</p>
+          <p className="hud-cue">{VERB} the handheld to pick it up</p>
           <button className="hud-quiet" onClick={actions.close}>
             Zip it back up
           </button>
@@ -210,7 +235,19 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
                   : 'Put the batteries back to power on'}
             </p>
           )}
-          {off && !missing && !flipped && <p className="hud-hint">Click the glowing switch on the top edge, tap Power, or press P</p>}
+          {off && !missing && !flipped && (
+            <p className="hud-hint">
+              {TOUCH
+                ? 'Tap the glowing switch on the top edge, or tap Power'
+                : 'Click the glowing switch on the top edge, click Power, or press P'}
+            </p>
+          )}
+          {showGoal && (
+            <p className="hud-hint">
+              Each note moves the drop to its row. Catch all three fruit in one run, then{' '}
+              {TOUCH ? 'tap Start (the right small button).' : 'press Start (Enter).'}
+            </p>
+          )}
           <nav className="hud-bar" aria-label="Device">
             <button className={`hud-btn ${off ? '' : 'is-on'}`} onClick={value.togglePower} aria-pressed={!off}>
               <span className="led" aria-hidden /> Power

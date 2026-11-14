@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { dismissBoot } from './boot'
 import ExperienceApp from './ExperienceApp'
 import FlatApp from './FlatApp'
 
@@ -16,6 +17,8 @@ export default function App() {
   }, [])
   useEffect(() => {
     document.body.dataset.view = hash === '#flat' ? 'flat' : 'handheld'
+    // The flat game has nothing to load; the 3D view dismisses it when ready.
+    if (hash === '#flat') dismissBoot()
   }, [hash])
   if (hash === '#flat') return <FlatApp key="flat" />
   return <ExperienceApp key={hash === '#handheld' ? 'in-hand' : 'intro'} startInHand={hash === '#handheld'} />
