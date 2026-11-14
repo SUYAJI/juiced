@@ -7,6 +7,7 @@ import { GameController, type Action } from './game/controller'
 import { LEVEL_01 } from './game/level'
 import { GameStore, useGameState } from './game/store'
 import type { HandheldContextValue } from './handheld/context'
+import { FRONT_Z, LCD } from './handheld/dims'
 import { PartsStore, useParts } from './handheld/parts'
 import { attachKeyboard } from './input/keyboard'
 import { Renderer } from './render/renderer'
@@ -65,6 +66,10 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
     setReady(true)
     dismissBoot()
   }, [])
+  // Won since it was last picked up / packed after a win (closing cue).
+  const wonRef = useRef(false)
+  const packRef = useRef(false)
+  const [packed, setPacked] = useState(false)
 
   const value = useMemo<HandheldContextValue>(() => {
     const { store, controller, renderer, gameCanvas } = game
@@ -96,6 +101,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
     return {
       open: () => {
         if (!exp.open()) return
+        setPacked(false)
         withAudio(() => {
           setTimeout(() => engine.rustle(0.5), exp.durations.lidDelay * 1000)
         })
@@ -110,15 +116,40 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       },
       putBack: () => {
         if (!exp.putBack()) return
+        // After a win, putting it back ends the visit: the bag zips itself shut.
+        if (wonRef.current || game.store.get().phase === 'won') packRef.current = true
         setFlipped(false)
         game.parts.reseatAll()
         withAudio(() => setTimeout(() => engine.rustle(0.3), exp.durations.putBack * 700))
       },
       skip: () => {
+        setPacked(false)
         exp.skipToHandheld()
       },
     }
   }, [game, exp])
+
+  // ---- the victory moment ---------------------------------------------
+  // 1. On a win, juice drops spill out of the screen with the fanfare.
+  useEffect(() => {
+    if (gameState.wonAt === null) return
+    wonRef.current = true
+    if (reduced || flippedRef.current || exp.state !== 'handheldActive') return
+    game.parts.spawn({ origin: [0, LCD.y - LCD.h / 2, FRONT_Z], side: 'front', count: 14 })
+  }, [gameState.wonAt, game, exp, reduced])
+
+  // 2. Put back after a win: once it's lying in the tray, zip the bag shut.
+  useEffect(() => {
+    if (snap.state !== 'lunchboxOpen' || !packRef.current) return
+    packRef.current = false
+    wonRef.current = false
+    const id = setTimeout(() => {
+      if (exp.state !== 'lunchboxOpen') return
+      setPacked(true)
+      actions.close()
+    }, reduced ? 150 : 500)
+    return () => clearTimeout(id)
+  }, [snap.state, exp, actions, reduced])
 
   // remember that the intro has been seen once the handheld is in hand
   useEffect(() => {
@@ -180,6 +211,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
   const missing = partsState.cart || partsState.batteries[0] || partsState.batteries[1]
   // First time at the controls: say what the puzzle is until the first run.
   const showGoal = gameState.power === 'on' && gameState.phase === 'edit' && gameState.runs === 0 && !flipped
+  const won = gameState.power === 'on' && gameState.phase === 'won' && !flipped
 
   return (
     <div className="handheld-page" data-state={s} data-ready={ready}>
@@ -201,7 +233,16 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
         </a>
       </header>
 
-      {ready && s === 'lunchboxClosed' && (
+      {ready && s === 'lunchboxClosed' && packed && (
+        <div className="hud-foot">
+          <p className="hud-cue">All packed up. Thanks for playing.</p>
+          <button className="hud-quiet" onClick={actions.open}>
+            Unzip it again
+          </button>
+        </div>
+      )}
+
+      {ready && s === 'lunchboxClosed' && !packed && (
         <div className="hud-foot">
           <p className="hud-cue">{VERB} the lunchbox to unzip it</p>
           {seen && (
@@ -223,7 +264,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
 
       {s === 'handheldActive' && (
         <>
-          <button className="hud-back" onClick={actions.putBack} title="Esc">
+          <button className={`hud-back ${won ? 'is-cta' : ''}`} onClick={actions.putBack} title="Esc">
             ← Put it back
           </button>
           {off && missing && (
@@ -242,6 +283,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
                 : 'Click the glowing switch on the top edge, click Power, or press P'}
             </p>
           )}
+          {won && <p className="hud-hint is-win">Juiced! Remix your tune, or put the handheld back to pack up.</p>}
           {showGoal && (
             <p className="hud-hint">
               Each note moves the drop to its row. Catch all three fruit in one run, then{' '}

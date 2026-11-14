@@ -378,6 +378,26 @@ body[data-view='handheld'] {
   opacity: 0.85;
 }
 
+/* After a win: the way out gets a little light */
+.hud-back.is-cta {
+  opacity: 1;
+  border-color: #f2c14e;
+  color: #fff1cf;
+  box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.18);
+}
+
+.hud-hint.is-win {
+  border-color: #f2c14e;
+  color: #fff1cf;
+  animation: fade-in 500ms ease both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
 @keyframes cue-in {
   from {
     opacity: 0;
