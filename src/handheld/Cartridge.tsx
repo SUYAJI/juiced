@@ -14,7 +14,7 @@ const BULGE_COLOR = '#25232b'
  * the body on the back; the rounded rumble bulge fills the back window.
  */
 export function Cartridge() {
-  const { parts, isActive, isFlipped } = useHandheld()
+  const { parts, isActive, isFlipped, sfx } = useHandheld()
   const g = useRef<THREE.Group>(null)
   const k = useRef(0)
   useFrame((_, dt) => {
@@ -27,14 +27,16 @@ export function Cartridge() {
     grp.position.set(0, 3.1 * e, 0.5 * e)
     grp.rotation.set(0.12 * e, 0, 0.06 * e)
   })
+  // Removed from the back only (its bulge sits behind the screen, so a front
+  // click on the screen must never pull it). Once out, it can be pushed back
+  // in from either side.
+  const usable = () => isActive() && (isFlipped() || parts.get().cart)
   const click = (e: ThreeEvent<PointerEvent>) => {
-    if (!isActive()) return
+    if (!usable()) return
     e.stopPropagation()
     const nowOut = parts.toggleCart()
-    if (nowOut) {
-      const side = isFlipped() ? 'back' : 'front'
-      parts.spawn({ origin: [0, TOP_Y - 0.2, 0], side, count: 9 })
-    }
+    sfx(nowOut ? 'cartOut' : 'cartIn')
+    if (nowOut) parts.spawn({ origin: [0, TOP_Y - 0.2, 0], side: 'back', count: 9 })
   }
 
   const label = useMemo(() => cartLabelTexture(), [])
@@ -66,7 +68,7 @@ export function Cartridge() {
     <group
       ref={g}
       onPointerDown={click}
-      onPointerOver={() => isActive() && (document.body.style.cursor = 'pointer')}
+      onPointerOver={() => usable() && (document.body.style.cursor = 'pointer')}
       onPointerOut={() => isActive() && (document.body.style.cursor = 'auto')}
     >
       <RoundedBox args={[CART.w, h, CART.d]} radius={0.12} smoothness={3} position={[0, cy, cz]}>

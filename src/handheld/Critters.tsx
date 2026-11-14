@@ -6,7 +6,7 @@ import { BACK_Z, BODY, FRONT_Z } from './dims'
 import type { SpawnRequest } from './parts'
 
 // Juice-drop critters: little 3D versions of Pip, the drop from the game,
-// in the fruit colours. When a battery or the cartridge is lifted out they
+// in the fruit colours. When the cartridge is lifted out, or a puzzle is won, they
 // tumble out of the opening, scurry across the device, and evaporate.
 
 const POOL = 40

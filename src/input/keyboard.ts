@@ -1,6 +1,6 @@
 import type { Action } from '../game/controller'
 
-/** Keyboard mapping for the Game Boy inputs. */
+/** Keyboard mapping for the handheld inputs. */
 const KEY_MAP: Record<string, Action> = {
   ArrowLeft: 'left',
   ArrowRight: 'right',

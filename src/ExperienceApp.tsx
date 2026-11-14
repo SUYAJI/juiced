@@ -39,7 +39,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
     const gameCanvas = document.createElement('canvas')
     const renderer = new Renderer(gameCanvas, store, LEVEL_01)
     const parts = new PartsStore()
-    // a battery or the cartridge out means no power (composition is kept)
+    // the cartridge out means no power (composition is kept)
     parts.subscribe(() => controller.setPowerBlocked(parts.anyOut()))
     return { store, engine, controller, gameCanvas, renderer, parts }
   }, [])
@@ -72,7 +72,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
   const [packed, setPacked] = useState(false)
 
   const value = useMemo<HandheldContextValue>(() => {
-    const { store, controller, renderer, gameCanvas } = game
+    const { store, controller, renderer, gameCanvas, engine } = game
     const press = (action: Action) => {
       if (exp.state !== 'handheldActive') return
       void controller.ensureAudio().then(() => controller.dispatch(action))
@@ -91,8 +91,20 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       isActive: () => exp.state === 'handheldActive',
       isFlipped: () => flippedRef.current,
       parts: game.parts,
+      sfx: (kind) => void controller.ensureAudio().then(() => engine.sfx(kind)),
     }
   }, [game, exp])
+
+  /** Turn the device over (front <-> back), with the sound of handling it. */
+  const flipTo = useCallback(
+    (to: boolean) => {
+      if (to === flippedRef.current) return
+      flippedRef.current = to
+      setFlipped(to)
+      value.sfx('flip')
+    },
+    [value],
+  )
 
   // ---- experience actions (each one is a user gesture, so audio can start)
   const actions = useMemo(() => {
@@ -103,12 +115,16 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
         if (!exp.open()) return
         setPacked(false)
         withAudio(() => {
+          engine.zipper(exp.durations.unzip, 0.05)
           setTimeout(() => engine.rustle(0.5), exp.durations.lidDelay * 1000)
         })
       },
       close: () => {
         if (!exp.close()) return
-        withAudio(() => engine.rustle(0.45))
+        withAudio(() => {
+          engine.rustle(0.45)
+          engine.zipper(exp.durations.zipUp, exp.durations.lidClose)
+        })
       },
       pickUp: () => {
         if (!exp.pickUp()) return
@@ -120,7 +136,10 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
         if (wonRef.current || game.store.get().phase === 'won') packRef.current = true
         setFlipped(false)
         game.parts.reseatAll()
-        withAudio(() => setTimeout(() => engine.rustle(0.3), exp.durations.putBack * 700))
+        withAudio(() => {
+          setTimeout(() => engine.rustle(0.3), exp.durations.putBack * 700)
+          setTimeout(() => engine.sfx('setDown'), exp.durations.putBack * 950)
+        })
       },
       skip: () => {
         setPacked(false)
@@ -171,7 +190,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       const s = exp.state
       if (s === 'handheldActive') {
         if (e.key === 'p' || e.key === 'P') value.togglePower()
-        if (e.key === 'f' || e.key === 'F') setFlipped((f) => !f)
+        if (e.key === 'f' || e.key === 'F') flipTo(!flippedRef.current)
         if (e.key === 'Escape') actions.putBack()
       } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
@@ -186,7 +205,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       getState: () => store.get(),
       dispatch: value.press,
       togglePower: value.togglePower,
-      flip: (v?: boolean) => setFlipped((f) => (v === undefined ? !f : v)),
+      flip: (v?: boolean) => flipTo(v === undefined ? !flippedRef.current : v),
       canvas: game.gameCanvas,
       experience: () => exp.state,
       open: actions.open,
@@ -204,11 +223,11 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
       controller.dispose()
       document.body.style.cursor = 'auto'
     }
-  }, [game, exp, value, actions])
+  }, [game, exp, value, actions, flipTo])
 
   const s = snap.state
   const off = gameState.power === 'off'
-  const missing = partsState.cart || partsState.batteries[0] || partsState.batteries[1]
+  const missing = partsState.cart
   // First time at the controls: say what the puzzle is until the first run.
   const showGoal = gameState.power === 'on' && gameState.phase === 'edit' && gameState.runs === 0 && !flipped
   const won = gameState.power === 'on' && gameState.phase === 'won' && !flipped
@@ -267,15 +286,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
           <button className={`hud-back ${won ? 'is-cta' : ''}`} onClick={actions.putBack} title="Esc">
             ← Put it back
           </button>
-          {off && missing && (
-            <p className="hud-hint">
-              {partsState.cart && (partsState.batteries[0] || partsState.batteries[1])
-                ? 'Put the batteries and cartridge back to power on'
-                : partsState.cart
-                  ? 'Put the cartridge back to power on'
-                  : 'Put the batteries back to power on'}
-            </p>
-          )}
+          {off && missing && <p className="hud-hint">{VERB} the cartridge to slide it back in, then power on</p>}
           {off && !missing && !flipped && (
             <p className="hud-hint">
               {TOUCH
@@ -294,7 +305,7 @@ export default function ExperienceApp({ startInHand = false }: { startInHand?: b
             <button className={`hud-btn ${off ? '' : 'is-on'}`} onClick={value.togglePower} aria-pressed={!off}>
               <span className="led" aria-hidden /> Power
             </button>
-            <button className="hud-btn" onClick={() => setFlipped((f) => !f)} aria-pressed={flipped}>
+            <button className="hud-btn" onClick={() => flipTo(!flipped)} aria-pressed={flipped}>
               {flipped ? 'Show front' : 'Show back'}
             </button>
           </nav>

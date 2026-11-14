@@ -11,20 +11,20 @@ export interface SpawnRequest {
 }
 
 export interface PartsState {
-  batteries: [boolean, boolean]
   cart: boolean
 }
 
 type Listener = () => void
 
 /**
- * Removable parts of the handheld (the two AAs and the cartridge), plus a
- * tiny event channel for the juice-drop critters that tumble out when a
- * part is lifted. Kept outside the game store: it is about the object,
- * not the game. Taking a part out powers the device off (see ExperienceApp).
+ * The removable cartridge, plus a tiny event channel for the juice-drop
+ * critters (they tumble out when the cartridge is lifted, and spill from the
+ * screen on a win). Kept outside the game store: it is about the object, not
+ * the game. Taking the cartridge out powers the device off (see ExperienceApp).
+ * The batteries are fixed in the bay: they are scenery, not a control.
  */
 export class PartsStore {
-  private state: PartsState = { batteries: [false, false], cart: false }
+  private state: PartsState = { cart: false }
   private listeners = new Set<Listener>()
   private spawners = new Set<(r: SpawnRequest) => void>()
 
@@ -33,7 +33,7 @@ export class PartsStore {
   }
 
   anyOut(): boolean {
-    return this.state.cart || this.state.batteries[0] || this.state.batteries[1]
+    return this.state.cart
   }
 
   private set(next: PartsState) {
@@ -41,22 +41,15 @@ export class PartsStore {
     this.listeners.forEach((l) => l())
   }
 
-  toggleBattery(i: 0 | 1): boolean {
-    const batteries: [boolean, boolean] = [...this.state.batteries]
-    batteries[i] = !batteries[i]
-    this.set({ ...this.state, batteries })
-    return batteries[i]
-  }
-
   toggleCart(): boolean {
-    this.set({ ...this.state, cart: !this.state.cart })
+    this.set({ cart: !this.state.cart })
     return this.state.cart
   }
 
-  /** Put everything back (used when the handheld goes back in the lunchbox). */
+  /** Put the cartridge back (used when the handheld goes back in the lunchbox). */
   reseatAll(): void {
     if (!this.anyOut()) return
-    this.set({ batteries: [false, false], cart: false })
+    this.set({ cart: false })
   }
 
   subscribe(l: Listener): () => void {

@@ -4,6 +4,11 @@ import type { Lane } from '../game/types'
 
 export type StepCallback = (step: number, time: number) => void
 
+/** Physical-object sounds that are not tied to a button. */
+export type Sfx = 'cartOut' | 'cartIn' | 'flip' | 'setDown'
+
+const rand = (a: number, b: number) => a + Math.random() * (b - a)
+
 /**
  * All sound lives here. The Transport is the single clock: the controller
  * receives `onStep(step, time)` from `scheduleRepeat`, triggers notes at
@@ -17,10 +22,20 @@ export class AudioEngine {
   private ui!: Tone.PolySynth<Tone.Synth>
   private repeatId: number | null = null
   private master!: Tone.Volume
-  private zipSynth: Tone.NoiseSynth | null = null
-  private zipLfo: Tone.LFO | null = null
   private cloth: Tone.NoiseSynth | null = null
   private stepCounter = 0
+
+  // Tactile layer: plastic, rubber and metal sounds of the object itself.
+  // Each voice is monophonic and very short; `at()` keeps every voice's
+  // start times strictly increasing so rapid presses never throw.
+  private tick!: Tone.NoiseSynth // the click of a part seating
+  private tickBand!: Tone.Filter
+  private thump!: Tone.MembraneSynth // the body of a press
+  private slide!: Tone.NoiseSynth // plastic sliding against plastic
+  private slideBand!: Tone.Filter
+  private chirp!: Tone.Synth // little electronic responses
+  private teeth!: Tone.NoiseSynth // zipper teeth, its own voice
+  private last = new Map<object, number>()
 
   get isStarted(): boolean {
     return this.started
@@ -65,6 +80,38 @@ export class AudioEngine {
     }).connect(master)
     this.ui.volume.value = -14
     this.ui.maxPolyphony = 8
+
+    // Tactile layer, kept well under the music.
+    const fx = new Tone.Volume(-4).connect(master)
+    this.tickBand = new Tone.Filter({ type: 'bandpass', frequency: 3200, Q: 1.6 }).connect(fx)
+    this.tick = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.016, sustain: 0, release: 0.008 },
+    }).connect(this.tickBand)
+    this.tick.volume.value = -10
+    this.thump = new Tone.MembraneSynth({
+      pitchDecay: 0.014,
+      octaves: 2.5,
+      envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.02 },
+    }).connect(fx)
+    this.thump.volume.value = -14
+    this.slideBand = new Tone.Filter({ type: 'bandpass', frequency: 1200, Q: 0.9 }).connect(fx)
+    this.slide = new Tone.NoiseSynth({
+      noise: { type: 'pink' },
+      envelope: { attack: 0.02, decay: 0.08, sustain: 0.5, release: 0.05 },
+    }).connect(this.slideBand)
+    this.slide.volume.value = -12
+    this.chirp = new Tone.Synth({
+      oscillator: { type: 'square' },
+      envelope: { attack: 0.001, decay: 0.05, sustain: 0.1, release: 0.03 },
+    }).connect(fx)
+    this.chirp.volume.value = -24
+    const teethBand = new Tone.Filter({ type: 'bandpass', frequency: 4300, Q: 2.5 }).connect(fx)
+    this.teeth = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.009, sustain: 0, release: 0.005 },
+    }).connect(teethBand)
+    this.teeth.volume.value = -16
 
     const transport = Tone.getTransport()
     transport.bpm.value = BPM
@@ -151,37 +198,135 @@ export class AudioEngine {
     this.blip.triggerAttackRelease('E6', '8n', time + 0.42)
   }
 
-  // ---- Lunchbox: zipper and fabric -----------------------------------
+  // ---- Tactile layer: the object itself --------------------------------
+
+  /** Next safe start time for a monophonic voice (strictly increasing). */
+  private at(voice: object, offset = 0, gap = 0.012): number {
+    const t = Math.max(Tone.now() + 0.004 + offset, (this.last.get(voice) ?? 0) + gap)
+    this.last.set(voice, t)
+    return t
+  }
+
+  private click(freq: number, q: number, vel: number, offset = 0): void {
+    const t = this.at(this.tick, offset)
+    this.tickBand.frequency.setValueAtTime(freq * rand(0.93, 1.07), t)
+    this.tickBand.Q.setValueAtTime(q, t)
+    this.tick.triggerAttackRelease(0.012, t, vel * rand(0.8, 1))
+  }
+
+  private body(freq: number, vel: number, offset = 0): void {
+    const t = this.at(this.thump, offset)
+    this.thump.triggerAttackRelease(freq * rand(0.96, 1.04), 0.05, t, vel * rand(0.85, 1))
+  }
+
+  private scrape(from: number, to: number, length: number, vel: number, offset = 0): void {
+    const t = this.at(this.slide, offset, length + 0.02)
+    this.slideBand.frequency.setValueAtTime(from, t)
+    this.slideBand.frequency.exponentialRampToValueAtTime(to, t + length)
+    this.slide.triggerAttackRelease(length, t, vel)
+  }
 
   /**
-   * A zipper run: band-passed noise chopped by a square LFO (the teeth),
-   * speeding up mid-pull. Built on first use.
+   * The mechanical feel of a button, heard whether or not the device is on:
+   * a crisp rocker tick for the D-pad, a rubbery thud for A and B, a small
+   * soft click for the Start and Select pills.
    */
-  zip(duration: number): void {
+  press(action: string): void {
     if (!this.started) return
-    if (!this.zipSynth) {
-      const gate = new Tone.Gain(0)
-      this.zipLfo = new Tone.LFO({ frequency: 36, min: 0.15, max: 1, type: 'square' }).connect(gate.gain).start()
-      const band = new Tone.Filter({ type: 'bandpass', frequency: 3000, Q: 0.8 })
-      const vol = new Tone.Volume(-15).connect(this.master)
-      this.zipSynth = new Tone.NoiseSynth({
-        noise: { type: 'white' },
-        envelope: { attack: 0.03, decay: 0.05, sustain: 0.8, release: 0.12 },
-      })
-      this.zipSynth.chain(band, gate, vol)
-    }
-    const t = Tone.now() + 0.01
-    const f = this.zipLfo!.frequency
-    f.cancelScheduledValues(t)
-    f.setValueAtTime(26, t)
-    f.linearRampToValueAtTime(58, t + duration * 0.45)
-    f.linearRampToValueAtTime(34, t + duration)
-    try {
-      this.zipSynth.triggerAttackRelease(duration, t)
-    } catch {
-      /* a second pull mid-pull: ignore */
+    switch (action) {
+      case 'up':
+      case 'down':
+      case 'left':
+      case 'right':
+        this.click(3800, 2.2, 0.75)
+        this.body(260, 0.25)
+        break
+      case 'a':
+        this.click(1900, 1.2, 0.6)
+        this.body(150, 0.7)
+        break
+      case 'b':
+        this.click(1600, 1.2, 0.6)
+        this.body(124, 0.7)
+        break
+      case 'start':
+      case 'select':
+        this.click(2600, 1.6, 0.45)
+        this.body(330, 0.18)
+        break
     }
   }
+
+  /** The power switch sliding along the top edge and snapping into place. */
+  powerSwitch(): void {
+    if (!this.started) return
+    this.scrape(1500, 2600, 0.045, 0.35)
+    this.click(3000, 2, 0.9, 0.05)
+    this.body(190, 0.35, 0.05)
+  }
+
+  /** The screen losing power: a short falling electronic sigh. */
+  powerDown(): void {
+    if (!this.started) return
+    const t = this.at(this.chirp)
+    this.chirp.triggerAttack(880, t, 0.6)
+    this.chirp.frequency.exponentialRampToValueAtTime(110, t + 0.2)
+    this.chirp.triggerRelease(t + 0.2)
+    this.last.set(this.chirp, t + 0.24)
+  }
+
+  /** Physical handling sounds. */
+  sfx(kind: Sfx): void {
+    if (!this.started) return
+    switch (kind) {
+      case 'cartOut': // pulled up the slot, then pops free
+        this.scrape(700, 2200, 0.16, 0.55)
+        this.body(92, 0.8, 0.15)
+        this.click(1400, 1, 0.5, 0.15)
+        break
+      case 'cartIn': {
+        // slid down, seats with a click, contacts answer with a chirp
+        this.scrape(2200, 800, 0.12, 0.5)
+        this.click(2300, 1.4, 1, 0.13)
+        this.body(118, 0.8, 0.13)
+        const t = this.at(this.chirp, 0.24)
+        this.chirp.triggerAttackRelease(1568, 0.04, t, 0.7)
+        this.chirp.triggerAttackRelease(2093, 0.05, t + 0.06, 0.7)
+        this.last.set(this.chirp, t + 0.12)
+        break
+      }
+      case 'flip': // turned over in the hand: a soft plastic swish
+        this.scrape(600, 1800, 0.16, 0.9)
+        this.click(2200, 0.9, 0.55, 0.15)
+        this.body(210, 0.3, 0.15)
+        break
+      case 'setDown': // laid back in the padded tray
+        this.body(70, 0.6)
+        this.scrape(900, 500, 0.06, 0.25)
+        break
+    }
+  }
+
+  /**
+   * Zipper teeth: a run of tiny ticks that speeds up mid-pull and eases off,
+   * starting `delay` seconds from now and lasting `duration`.
+   */
+  zipper(duration: number, delay = 0): void {
+    if (!this.started) return
+    const n = Math.max(6, Math.round(duration * 24))
+    const start = this.at(this.teeth, delay)
+    let t = start
+    for (let i = 0; i < n; i++) {
+      // ease in-out spacing: slower at the ends, fastest in the middle
+      const u = i / n
+      const ti = start + duration * (u - Math.sin(2 * Math.PI * u) / (2 * Math.PI) * 0.6)
+      t = Math.max(t + 0.006, ti)
+      this.teeth.triggerAttackRelease(0.006, t, rand(0.45, 1))
+    }
+    this.last.set(this.teeth, t)
+  }
+
+  // ---- Lunchbox: fabric -----------------------------------------------
 
   /** Soft fabric handling: a short low-passed pink noise brush. */
   rustle(length = 0.4): void {

@@ -28,7 +28,7 @@ export class GameController {
   private winning = false
   private bootTimer: ReturnType<typeof setTimeout> | null = null
   private pressListeners = new Set<PressListener>()
-  /** True while a battery or the cartridge is out: no power. */
+  /** True while the cartridge is out: no power. */
   private powerBlocked = false
 
   constructor(
@@ -58,6 +58,8 @@ export class GameController {
 
   dispatch(action: Action): void {
     this.pressListeners.forEach((l) => l(action))
+    // The button itself clicks, on or off, like the real thing.
+    this.engine.press(action)
     const power = this.store.get().power
     if (power === 'off') return
     if (power === 'booting') {
@@ -87,11 +89,12 @@ export class GameController {
   // ---- Power -----------------------------------------------------------
 
   togglePower(): void {
+    this.engine.powerSwitch()
     if (this.store.get().power === 'off') this.powerOn()
     else this.powerOff()
   }
 
-  /** A battery or cartridge came out (true) or everything is back (false). */
+  /** The cartridge came out (true) or is back in (false). */
   setPowerBlocked(blocked: boolean): void {
     this.powerBlocked = blocked
     if (blocked) this.powerOff()
@@ -113,6 +116,7 @@ export class GameController {
     if (this.store.get().power === 'off') return
     this.clearBootTimer()
     this.engine.stop()
+    this.engine.powerDown()
     this.winning = false
     // Keep the composition; stop any run and go dark.
     this.store.set({

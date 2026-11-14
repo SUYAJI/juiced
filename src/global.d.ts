@@ -20,7 +20,7 @@ declare global {
       putBack?: () => void
       close?: () => void
       timeScale?: (v: number) => void
-      parts?: () => { batteries: [boolean, boolean]; cart: boolean }
+      parts?: () => { cart: boolean }
     }
   }
 }

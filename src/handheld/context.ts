@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { Sfx } from '../audio/engine'
 import type { Action, GameController } from '../game/controller'
 import type { GameStore } from '../game/store'
 import type { Renderer } from '../render/renderer'
@@ -19,8 +20,10 @@ export interface HandheldContextValue {
   isActive: () => boolean
   /** True while the device is turned to show its back. */
   isFlipped: () => boolean
-  /** Removable batteries and cartridge, and the critter channel. */
+  /** Removable cartridge, and the critter channel. */
   parts: PartsStore
+  /** Play a tactile sound for a physical interaction (unlocks audio first). */
+  sfx: (kind: Sfx) => void
 }
 
 export const HandheldContext = createContext<HandheldContextValue | null>(null)

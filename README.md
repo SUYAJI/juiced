@@ -1,24 +1,30 @@
-# JUICED — Implementation 03
+# JUICED
 
-A tiny musical puzzle game for a virtual handheld. Eight steps, four pitches,
-one juice drop, three fruit. Compose the melody that carries the drop across
-all three fruit in a single run.
+**Play it : https://suyaji.github.io/juiced/**
 
-Implementation 03 opens with a 3D recreation of the real 1997 yellow soft
-lunchbox. Unzip it, fold the cap back, and pick up the purple handheld from
-Implementation 02 to play. `#handheld` jumps straight to the handheld;
-`#flat` runs the 2D game on its own.
+A tiny musical puzzle game for a virtual handheld game console. Eight steps,
+four pitches, one juice drop, three fruit. Compose the melody that carries the
+drop across all three fruit in a single run.
+
+It opens with a 3D recreation of the real 1997 yellow soft lunchbox. Unzip it,
+pick up the purple handheld, power it on and play; put it back after a win and
+the bag zips itself shut. `#handheld` jumps straight to the handheld; `#flat`
+runs the 2D game on its own.
 
 ## Run
 
     npm install
     npm run dev        # http://localhost:5173
+    npm test           # puzzle, controller and parts tests (Vitest)
     npm run build      # production build in dist/ (relative base, host anywhere)
     npm run preview    # serve dist/ locally
 
+Every push to `main` is tested, built and deployed to GitHub Pages
+(`.github/workflows/deploy.yml`).
+
 ## Controls
 
-| Game Boy | Keyboard | Action |
+| Handheld | Keyboard | Action |
 |---|---|---|
 | D-pad left/right | Arrow left/right | choose step |
 | D-pad up/down | Arrow up/down | choose pitch (G E D C, top to bottom) |
@@ -31,8 +37,17 @@ On-screen buttons mirror these. Any first key or click unlocks audio.
 
 3D handheld extras : click/tap the device's buttons directly; the power switch
 is on the top edge (or the Power button, or P). F or "Show back" turns the
-device around. Drag to tilt a little; scroll/pinch to zoom a little.
-The boot sequence (~2.3 s) is skipped by pressing any game button.
+device around; from the back the cartridge can be pulled out (which cuts the
+power) and pushed back in. The batteries are fixed. Drag to tilt a little;
+scroll/pinch to zoom a little. The boot sequence (~2.3 s) is skipped by
+pressing any game button.
+
+Sound : the music and editing blips run on the Tone.js Transport; a separate
+tactile layer gives each physical part its own sound, quieter than the music :
+D-pad ticks, rubbery A/B thuds, soft Start/Select clicks (heard even with the
+power off), the power switch slide, a falling sigh when the screen loses power,
+the cartridge scraping out and clicking back in, turning the device over,
+setting it down, and zipper teeth on the lunchbox.
 
 ## Lunchbox flow
 
