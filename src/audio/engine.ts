@@ -24,6 +24,7 @@ export class AudioEngine {
   private master!: Tone.Volume
   private cloth: Tone.NoiseSynth | null = null
   private stepCounter = 0
+  private runGeneration = 0
 
   // Tactile layer: plastic, rubber and metal sounds of the object itself.
   // Each voice is monophonic and very short; `at()` keeps every voice's
@@ -45,6 +46,8 @@ export class AudioEngine {
   async start(): Promise<void> {
     if (this.started) return
     await Tone.start()
+    // Multiple gestures can await audio unlock together. Only the first builds the graph.
+    if (this.started) return
 
     const master = new Tone.Volume(-6).toDestination()
     this.master = master
@@ -134,7 +137,10 @@ export class AudioEngine {
 
   /** Run `fn` on the animation frame closest to audio time `time`. */
   whenDrawn(time: number, fn: () => void): void {
-    Tone.getDraw().schedule(fn, time)
+    const generation = this.runGeneration
+    Tone.getDraw().schedule(() => {
+      if (generation === this.runGeneration) fn()
+    }, time)
   }
 
   /** Start the looping step clock. */
@@ -156,6 +162,7 @@ export class AudioEngine {
 
   /** Stop the clock and clear everything scheduled on it. */
   stop(): void {
+    this.runGeneration++
     if (!this.started) return
     const transport = Tone.getTransport()
     if (this.repeatId !== null) {

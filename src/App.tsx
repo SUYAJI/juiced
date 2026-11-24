@@ -1,7 +1,17 @@
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useState, type ReactNode } from 'react'
 import { dismissBoot } from './boot'
 import ExperienceApp from './ExperienceApp'
 import FlatApp from './FlatApp'
+
+class SceneFallback extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch() { dismissBoot() }
+  render() {
+    if (this.state.failed) return <main><p>The 3D lunchbox could not load.</p><a href="#flat">Play the 2D puzzle</a></main>
+    return this.props.children
+  }
+}
 
 /**
  * `#flat`      the game alone (2D, for testing)
@@ -21,5 +31,5 @@ export default function App() {
     if (hash === '#flat') dismissBoot()
   }, [hash])
   if (hash === '#flat') return <FlatApp key="flat" />
-  return <ExperienceApp key={hash === '#handheld' ? 'in-hand' : 'intro'} startInHand={hash === '#handheld'} />
+  return <SceneFallback><ExperienceApp key={hash === '#handheld' ? 'in-hand' : 'intro'} startInHand={hash === '#handheld'} /></SceneFallback>
 }
